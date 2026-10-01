@@ -1,0 +1,9 @@
+langgraph
+langchain
+langchain-openai
+streamlit
+pydantic
+pymupdf
+python-docx
+chromadb
+python-dotenv
