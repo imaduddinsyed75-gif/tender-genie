@@ -14,6 +14,11 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
 from core.state import TenderState
+# Shamir ke parser module se function import
+try:
+    from core.parser import parse_tender_scope
+except ImportError:
+    parse_tender_scope = None
 
 # Load environment variables
 load_dotenv()
@@ -28,12 +33,28 @@ else:
 # --- Node 1: Ingestion & Parser Node ---
 def parser_node(state: TenderState) -> Dict[str, Any]:
     print("[LOG] Running Parser Node...")
-    # Agar Shamir ka parser output already state mein hai to woh use karega
+    
+    # Check 1: Agar scope pehle se processed hai to skip karein
     existing_scope = state.get("parsed_scope")
     if existing_scope:
-        return {"current_status": "Document Parsed Successfully"}
+        return {"current_status": "Document Scope Already Present"}
+
+    raw_text = state.get("raw_text", "")
     
-    # Fallback / Default structure jab tak actual parser run nahi hota
+    # Check 2: Agar Shamir ka parser available hai aur raw_text moujood hai
+    if parse_tender_scope and raw_text and raw_text != "sample rfp":
+        try:
+            parsed = parse_tender_scope(raw_text)
+            # Agar parser Pydantic model return kare to dict bana lein
+            parsed_dict = parsed.model_dump() if hasattr(parsed, "model_dump") else dict(parsed)
+            return {
+                "parsed_scope": parsed_dict,
+                "current_status": "Document Scope Extracted via PyMuPDF Parser"
+            }
+        except Exception as e:
+            print(f"[WARN] Parser execution failed, using baseline: {e}")
+
+    # Fallback default structure (testing ke liye jab text na diya ho)
     default_scope = {
         "project_title": "Enterprise Cloud Migration RFP",
         "submission_deadline": "2026-10-25",
@@ -49,7 +70,7 @@ def parser_node(state: TenderState) -> Dict[str, Any]:
     }
     return {
         "parsed_scope": default_scope,
-        "current_status": "Document Scope Extracted"
+        "current_status": "Document Scope Extracted (Baseline)"
     }
 
 # --- Node 2: Compliance Auditor Node ---
