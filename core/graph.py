@@ -76,10 +76,20 @@ def parser_node(state: TenderState) -> Dict[str, Any]:
 # --- Node 2: Compliance Auditor Node ---
 def compliance_node(state: TenderState) -> Dict[str, Any]:
     print("[LOG] Running Compliance Auditor Node...")
-    existing_report = state.get("compliance_report")
-    if existing_report:
-        return {"current_status": "Compliance Audit Complete"}
-        
+    
+    # Try Abdur Rehman's adapter
+    try:
+        from agents.adapter import build_compliance_report
+        report = build_compliance_report(state)
+        if report:
+            return {
+                "compliance_report": report,
+                "current_status": "Compliance Audit Complete (via Agent)"
+            }
+    except Exception as e:
+        print(f"[WARN] Compliance adapter failed, using baseline: {e}")
+
+    # Baseline fallback
     default_compliance = {
         "summary": "Tender is eligible. 1 SLA penalty risk identified regarding downtime.",
         "risk_flags": [
@@ -94,16 +104,27 @@ def compliance_node(state: TenderState) -> Dict[str, Any]:
     }
     return {
         "compliance_report": default_compliance,
-        "current_status": "Compliance Audit Complete"
+        "current_status": "Compliance Audit Complete (Baseline)"
     }
+
 
 # --- Node 3: Pricing Estimator Node ---
 def pricing_node(state: TenderState) -> Dict[str, Any]:
     print("[LOG] Running Pricing Estimator Node...")
-    existing_pricing = state.get("pricing_estimate")
-    if existing_pricing:
-        return {"current_status": "Pricing Estimation Complete"}
-        
+    
+    # Try Abdur Rehman's adapter
+    try:
+        from agents.adapter import build_pricing_estimate
+        estimate = build_pricing_estimate(state)
+        if estimate:
+            return {
+                "pricing_estimate": estimate,
+                "current_status": "Pricing Estimation Complete (via Agent)"
+            }
+    except Exception as e:
+        print(f"[WARN] Pricing adapter failed, using baseline: {e}")
+
+    # Baseline fallback
     default_pricing = {
         "items": [
             {"item_name": "Cloud Architect Lead", "estimated_hours_or_units": 80, "unit_rate_usd": 120, "total_usd": 9600},
@@ -116,7 +137,7 @@ def pricing_node(state: TenderState) -> Dict[str, Any]:
     }
     return {
         "pricing_estimate": default_pricing,
-        "current_status": "Pricing Estimation Complete"
+        "current_status": "Pricing Estimation Complete (Baseline)"
     }
 
 # --- Node 4: Proposal Drafter Node (Lead - Imad) ---
