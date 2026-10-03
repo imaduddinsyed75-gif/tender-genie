@@ -7,6 +7,7 @@ from agents.schemas import BOQItem
 
 
 MAX_DISTANCE = 1.0
+RELATIVE_BAND = 0.15
 
 _KEYWORDS = (
     "firewall",
@@ -64,15 +65,23 @@ def extract_line_items(state: dict[str, Any]) -> list[dict]:
 
 def _is_relevant_match(item_name: str, match: dict) -> bool:
     item_name = item_name.lower()
-    query_terms = {
-        term
-        for term in re.findall(r"[a-z0-9]+", item_name)
-        if len(term) >= 4
-    }
+    query_terms = [term for term in re.findall(r"[a-z0-9]+", item_name) if len(term) >= 4]
     match_text = " ".join(
         str(match.get(key, "")).lower() for key in ("item", "category", "notes")
     )
-    return bool(query_terms & set(re.findall(r"[a-z0-9]+", match_text)))
+    match_terms = [
+        term for term in re.findall(r"[a-z0-9]+", match_text) if len(term) >= 4
+    ]
+    query_prefixes = {term[:5] for term in query_terms}
+    match_prefixes = {term[:5] for term in match_terms}
+    return bool(
+        query_prefixes & match_prefixes
+        or any(
+            query_term in match_term or match_term in query_term
+            for query_term in query_terms
+            for match_term in match_terms
+        )
+    )
 
 
 def run_pricing(state: dict[str, Any]) -> dict[str, Any]:
@@ -85,6 +94,13 @@ def run_pricing(state: dict[str, Any]) -> dict[str, Any]:
             if float(match.get("distance", float("inf"))) <= MAX_DISTANCE
             and _is_relevant_match(item_name, match)
         ]
+        if matches:
+            best_distance = min(float(match["distance"]) for match in matches)
+            matches = [
+                match
+                for match in matches
+                if float(match["distance"]) <= best_distance * (1 + RELATIVE_BAND)
+            ]
         if matches:
             unit_cost = float(median(float(match["unit_cost_pkr"]) for match in matches))
             margin_pct = float(median(float(match["margin_pct"]) for match in matches))

@@ -56,6 +56,23 @@ def test_nonsense_item_adds_user_input_marker_with_real_memory() -> None:
     assert result["boq_items"][0]["item"] == "wedding catering [USER INPUT REQUIRED]"
 
 
+def test_security_audit_gets_real_rate_from_memory() -> None:
+    result = run_pricing(
+        {"extracted_tables": [{"item": "Security Audit", "quantity": 1}]}
+    )
+
+    assert result["boq_items"][0]["unit_cost"] > 0
+    assert "[USER INPUT REQUIRED]" not in result["boq_items"][0]["item"]
+
+
+def test_network_switch_uses_closest_historical_rate() -> None:
+    result = run_pricing(
+        {"extracted_tables": [{"item": "Network Switch", "quantity": 1}]}
+    )
+
+    assert result["boq_items"][0]["unit_cost"] == 1_480_000
+
+
 def test_title_case_items_get_real_rates_from_memory() -> None:
     result = run_pricing(
         {
